@@ -14,9 +14,12 @@ import java.util.List;
  *   <li>Abschnitte mit Abstand ≤ {@code recording.merge-gap-seconds} werden verbunden.</li>
  *   <li>Abschnitte mit weniger als {@code recording.min-relevant-actions} relevanten Aktionen oder kürzer als
  *       {@code recording.min-segment-seconds} entfallen.</li>
- *   <li>Abschnitte länger als {@code recording.max-segment-minutes} werden in aufeinanderfolgende Teile zerlegt.</li>
+ *   <li>Abschnitte länger als {@code recording.max-segment-minutes} werden in {@code ceil(Länge / Maximum)}
+ *       gleich lange, lückenlos aufeinanderfolgende Teile zerlegt (Mindestanzahl und -länge gelten vorher, für den
+ *       ganzen Abschnitt). Eine Aktion genau auf einer Teilgrenze gehört zum späteren Teil.</li>
  * </ol>
- * Zeitangaben werden mit 20 Ticks pro Sekunde in Ticks umgerechnet.
+ * Zeitangaben werden mit 20 Ticks pro Sekunde in Ticks umgerechnet (abgerundet). Abschnitte ohne Länge
+ * ({@code toTick <= fromTick}) entfallen immer.
  */
 public interface SegmentPlanning {
 

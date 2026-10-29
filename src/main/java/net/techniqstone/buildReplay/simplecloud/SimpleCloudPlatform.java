@@ -15,7 +15,10 @@ public interface SimpleCloudPlatform extends AutoCloseable {
 
     enum ConnectOutcome { SUCCESS, ALREADY_CONNECTED, SERVER_NOT_FOUND, PLAYER_NOT_FOUND, FAILED, UNSUPPORTED }
 
-    /** Ob die Java-API geladen und eine Verbindung aufgebaut wurde. */
+    /**
+     * Ob die Java-API geladen und die Anbindung nicht geschlossen ist. Ob die NATS-Verbindung gerade steht, verrät
+     * die öffentliche API nicht - Aufrufe können daher trotzdem mit {@link ConnectOutcome#FAILED} enden.
+     */
     boolean isAvailable();
 
     /** Verbindet einen Spieler netzwerkweit mit einem Server (Proxy-Name, z. B. "dev"). */

@@ -16,9 +16,9 @@ import redis.embedded.core.ExecutableProvider;
 /**
  * Eingebetteter redis-server (codemonstur embedded-redis 1.4.3, Redis 6.2) auf einem festen Port, der sich für
  * Ausfalltests stoppen und auf demselben Port neu starten lässt. Kann der Server nicht starten, wird der Test mit
- * Begründung abgebrochen (nicht als Fehler gewertet).
+ * Begründung abgebrochen (nicht als Fehler gewertet). Öffentlich für die Integrationstests.
  */
-final class EmbeddedRedis implements AutoCloseable {
+public final class EmbeddedRedis implements AutoCloseable {
 
     private final int port;
     private final @Nullable String password;
@@ -31,7 +31,7 @@ final class EmbeddedRedis implements AutoCloseable {
         this.binaryDirectory = binaryDirectory(port);
     }
 
-    static EmbeddedRedis start() {
+    public static EmbeddedRedis start() {
         return start(TestSupport.freePort());
     }
 
@@ -47,7 +47,7 @@ final class EmbeddedRedis implements AutoCloseable {
         return redis;
     }
 
-    int port() {
+    public int port() {
         return port;
     }
 
@@ -86,7 +86,7 @@ final class EmbeddedRedis implements AutoCloseable {
     }
 
     /** Führt Befehle über eine eigene, ungepoolte Verbindung aus (für Prüfungen im Test). */
-    <T> T withJedis(Function<Jedis, T> action) {
+    public <T> T withJedis(Function<Jedis, T> action) {
         DefaultJedisClientConfig.Builder config = DefaultJedisClientConfig.builder().timeoutMillis(2_000);
         if (password != null) {
             config.password(password);

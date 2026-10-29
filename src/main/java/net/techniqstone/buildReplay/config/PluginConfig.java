@@ -57,6 +57,14 @@ public record PluginConfig(
         public boolean configured() {
             return !baseUrl.isBlank() && !networkId.isBlank() && !networkSecret.isBlank();
         }
+
+        /** Ohne Secret - die Einstellungen dürfen gefahrlos protokolliert werden. */
+        @Override
+        public String toString() {
+            return "SimpleCloudSettings[baseUrl=" + baseUrl + ", networkId=" + networkId + ", networkSecret="
+                    + redacted(networkSecret) + ", useJavaApi=" + useJavaApi + ", connectTimeout=" + connectTimeout
+                    + ", requestTimeout=" + requestTimeout + ", maxRetries=" + maxRetries + "]";
+        }
     }
 
     public record DatabaseSettings(
@@ -70,6 +78,15 @@ public record PluginConfig(
             int poolSize,
             Duration connectionTimeout,
             Map<String, String> properties) {
+
+        /** Ohne Passwort und JDBC-Parameter (können Zugangsdaten enthalten). */
+        @Override
+        public String toString() {
+            return "DatabaseSettings[enabled=" + enabled + ", host=" + host + ", port=" + port + ", database="
+                    + database + ", username=" + username + ", password=" + redacted(password) + ", tablePrefix="
+                    + tablePrefix + ", poolSize=" + poolSize + ", connectionTimeout=" + connectionTimeout
+                    + ", properties=" + properties.keySet() + "]";
+        }
     }
 
     public record RedisSettings(
@@ -83,6 +100,14 @@ public record PluginConfig(
             String keyPrefix,
             Duration timeout,
             int poolSize) {
+
+        /** Ohne Passwort. */
+        @Override
+        public String toString() {
+            return "RedisSettings[enabled=" + enabled + ", host=" + host + ", port=" + port + ", username=" + username
+                    + ", password=" + redacted(password) + ", database=" + database + ", ssl=" + ssl + ", keyPrefix="
+                    + keyPrefix + ", timeout=" + timeout + ", poolSize=" + poolSize + "]";
+        }
     }
 
     /** Aufnahme: Pufferaufnahme pro Spieler, Abschnitte mit Vor-/Nachlauf. */
@@ -352,6 +377,11 @@ public record PluginConfig(
 
         return new PluginConfig(r.string("server-name", ""), level, simpleCloud, database, redis, recording,
                 activity, display, playback, storage, resilience);
+    }
+
+    /** Platzhalter für Geheimnisse in {@code toString()}: nur, ob ein Wert gesetzt ist. */
+    private static String redacted(String secret) {
+        return secret == null || secret.isEmpty() ? "<leer>" : "***";
     }
 
     private static String trimTrailingSlash(String url) {

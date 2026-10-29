@@ -15,6 +15,10 @@ public interface Playback {
     /** Alle verfügbaren Abschnitte einer Sitzung nacheinander (mit {@code playback.auto-advance}). */
     void playSession(Player viewer, UUID owner, String sessionRef);
 
+    /**
+     * Beendet die laufende Wiedergabe, einen noch ladenden Start und die Sitzungs-Warteschlange des Zuschauers.
+     * Sendet immer eine Rückmeldung ("beendet" bzw. "du siehst gerade kein Replay").
+     */
     void stop(Player viewer);
 
     boolean isWatching(UUID viewer);

@@ -91,6 +91,18 @@ jobs:
             path="${path%$'\r'}"
             [ -z "$path" ] && continue
 
+            # Schutz: ein Dateiziel muss genau wie das gebaute Jar heißen, sonst würde ein fremdes Plugin
+            # (z. B. WorldsGUI-1.0-SNAPSHOT.jar) überschrieben. Verzeichnisziele sind immer erlaubt.
+            case "$path" in
+              *.jar)
+                if [ "$(basename "$path")" != "$JAR_NAME" ]; then
+                  echo "::error title=Deploy abgelehnt::$path heißt nicht $JAR_NAME - würde ein fremdes Plugin überschreiben"
+                  failed=1
+                  continue
+                fi
+                ;;
+            esac
+
             echo "Deploy nach: $path"
 
             # Ein fehlgeschlagener Server bricht die übrigen nicht mehr ab.

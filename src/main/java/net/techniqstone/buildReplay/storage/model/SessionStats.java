@@ -4,7 +4,10 @@ import java.time.Instant;
 import java.util.Set;
 import org.jspecify.annotations.Nullable;
 
-/** Aggregierte Abschnittsdaten einer Sitzung für Listen. */
+/**
+ * Aggregierte Abschnittsdaten einer Sitzung für Listen. Gelöschte Abschnitte (DELETED) zählen nicht mit;
+ * {@code firstSegmentAt} ist der früheste Beginn, {@code lastSegmentAt} das späteste Ende eines Abschnitts.
+ */
 public record SessionStats(
         int segments,
         int availableSegments,

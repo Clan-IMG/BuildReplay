@@ -1,0 +1,212 @@
+# =====================================================================================================================
+#  BuildReplay - Texte
+# =====================================================================================================================
+#  Farbcodes mit & (z. B. &a grün, &7 grau, &e gelb, &c rot, &8 dunkelgrau, &f weiß, &6 gold).
+#  Platzhalter in geschweiften Klammern ({player}, {page}, ...) werden beim Senden ersetzt; "\n" beginnt eine neue
+#  Zeile (in Hover-Texten). Fehlende Schlüssel werden beim Start aus der Standarddatei ergänzt.
+# =====================================================================================================================
+
+# Wird vor jede Nachricht gesetzt (nicht vor Folgezeilen von Listen).
+prefix: "&8[&6BuildReplay&8] &7"
+
+# Allgemeine Rückmeldungen, Eingabefehler und Verwendungshinweise
+command:
+  only-players: "&cDieser Befehl ist nur für Spieler."
+  no-permission: "&cDazu fehlt dir die Berechtigung."
+  unknown-subcommand: "&cUnbekannter Unterbefehl &e{input}&c. &7Hilfe: &e/buildreplay help"
+  cooldown: "&7Bitte warte einen Moment, bevor du den Befehl erneut verwendest."
+  invalid-page: "&c'{input}' ist keine gültige Seitenzahl &7(1–{max})&c."
+  invalid-ref: "&c'{input}' ist keine gültige Sitzungsreferenz. &7Beispiel: &e59dc83e5 &7(mind. {min} Zeichen)"
+  invalid-segment: "&c'{input}' ist keine gültige Abschnitt-ID."
+  invalid-player: "&c'{input}' ist kein gültiger Spielername."
+  unknown-player: "&cDer Spieler &e{player} &cist auf diesem Server nicht bekannt."
+  unknown-flag: "&cUnbekannte Option &e{input}&c."
+  usage:
+    sessions: "&7Verwendung: &e/buildreplay sessions [Spieler] [Seite]"
+    sessions-console: "&7Verwendung in der Konsole: &e/buildreplay sessions <Spieler> [Seite]"
+    session: "&7Verwendung: &e/buildreplay session <Referenz> [Spieler]"
+    play: "&7Verwendung: &e/buildreplay play <Abschnitt-ID> &7oder &e/buildreplay play session <Referenz> [Spieler]"
+    admin: "&7Verwendung: &e/buildreplay admin <recordings|inspect|reload|cleanup|sync>"
+    inspect: "&7Verwendung: &e/buildreplay admin inspect <Spieler>"
+    cleanup: "&7Verwendung: &e/buildreplay admin cleanup [--dry-run]"
+  warning-bullet: "&8• "
+
+# /buildreplay help
+help:
+  header: "&6BuildReplay &8– &7Bau-Replays deiner Spielsitzungen"
+  sessions: "&e/buildreplay sessions [Seite] &8– &7deine Sitzungen der letzten {days} Tage"
+  sessions-others: "&e/buildreplay sessions <Spieler> [Seite] &8– &7Sitzungen eines anderen Spielers"
+  session: "&e/buildreplay session <Referenz> &8– &7Replays einer Sitzung anzeigen"
+  play: "&e/buildreplay play <Abschnitt-ID> &8– &7einen Abschnitt abspielen"
+  play-session: "&e/buildreplay play session <Referenz> &8– &7eine ganze Sitzung abspielen"
+  stop: "&e/buildreplay stop &8– &7Wiedergabe beenden"
+  status: "&e/buildreplay status &8– &7Zustand von BuildReplay auf diesem Server"
+  admin: "&e/buildreplay admin <recordings|inspect|reload|cleanup|sync> &8– &7Verwaltung"
+  hover: "&7Klicken, um den Befehl einzufügen"
+
+# /buildreplay sessions - Liste wie im SimpleCloud-Dashboard ({date}, {duration}, Hover und Klick)
+sessions:
+  header-own: "&6Deine Sitzungen &8(&7letzte {days} Tage&8)"
+  header-other: "&6Sitzungen von &e{player} &8(&7letzte {days} Tage&8)"
+  empty: "&7Keine Sitzungen in den letzten {days} Tagen."
+  page-empty: "&7Seite {page} enthält keine Sitzungen."
+  entry:
+    bullet: "&8▪ "
+    separator: " &8· "
+    date: "&f{date}"
+    active: "&aAktiv"
+    duration: "&7{duration}"
+    provisional: " &8(vorläufig)"
+    segments-one: "&e1 &7Replay"
+    segments-many: "&e{count} &7Replays"
+    segments-partly: " &8({available} abspielbar)"
+    segments-none-playable: " &c(nicht abspielbar)"
+    no-segments: "&8keine Replays"
+    segments-unknown: "&8Replays unbekannt"
+    servers: "&7{servers}"
+    hover: "&6Sitzung &e{ref}\n&7Login: &f{login}\n&7Logout: &f{logout}\n&7Dauer: &f{duration}\n&7Server: &f{servers}\n&7Replays: &f{segments} &8({available} abspielbar)\n\n&eKlicken für Details"
+    hover-still-online: "&anoch online"
+    hover-provisional: "\n&8Vorläufige Sitzung: SimpleCloud war beim Login nicht erreichbar."
+    hover-unknown: "unbekannt"
+  nav:
+    previous: "&e[« Zurück]"
+    previous-disabled: "&8[« Zurück]"
+    next: "&e[Weiter »]"
+    next-disabled: "&8[Weiter »]"
+    page: " &7Seite &f{page}&7/&f{pages} "
+    page-open: " &7Seite &f{page} "
+    hover: "&7Seite {page} anzeigen"
+
+# /buildreplay session <Referenz> - Abschnitte einer Sitzung
+session:
+  not-found: "&cKeine Sitzung mit der Referenz &e{ref} &cgefunden."
+  ambiguous: "&eDie Referenz &f{ref} &epasst auf mehrere Sitzungen – bitte genauer angeben:"
+  ambiguous-candidate: "&8▪ &e{ref}"
+  ambiguous-hover: "&7Klicken für Details"
+  header: "&6Sitzung &e{ref} &8· &f{date} &8· {duration}{provisional}"
+  servers: "&7Server: &f{servers}"
+  route: "&7Verlauf: &f{route}"
+  segments-header: "&6Replay-Abschnitte &8({count})&6:"
+  no-segments: "&7In dieser Sitzung wurden keine Replay-Abschnitte gespeichert."
+  segment:
+    line: "&8{index}. &f{from}&7–&f{to} &8(&7{duration}&8) &8· &7{server} &8· &7{actions} Aktionen"
+    hover: "&6Abschnitt &e#{id}\n&7Zeitraum: &f{from} – {to}\n&7Dauer: &f{duration}\n&7Server: &f{server} &8/ &7Welt: &f{world}\n&7Vorlauf / Nachlauf: &f{preroll} / {postroll}\n&7Aktionen: &f{summary}\n&7Status: {status}"
+    play: "&a[▶ Abspielen]"
+    play-hover: "&7Abschnitt &e#{id} &7abspielen"
+    unplayable: "&8[{status}&8]"
+  play-all: "&a[▶ Ganze Sitzung]"
+  play-all-hover: "&7Alle {count} abspielbaren Abschnitte nacheinander abspielen"
+  back: "&e[« Zur Übersicht]"
+  back-hover: "&7Zurück zur Sitzungsliste"
+  segment-status:
+    available: "&aVerfügbar"
+    saving: "&eWird gespeichert"
+    missing: "&cFehlt"
+    corrupt: "&cBeschädigt"
+    deleted: "&8Gelöscht"
+    failed: "&cFehlgeschlagen"
+
+# Wiedergabe (/buildreplay play, /buildreplay stop, Übergabe an andere Server, Inventarschutz).
+# {id} = Abschnitt-ID, {server} = Servername, {ref} = Sitzungsreferenz, {detail} = technische Ursache
+playback:
+  started: "&aReplay &f#{id} &avon &f{player} &astartet &7({duration})&a."
+  stopped: "&7Wiedergabe beendet."
+  not-watching: "&7Du siehst gerade kein Replay."
+  pending: "&7Die Wiedergabe wird bereits vorbereitet ..."
+  already-watching: "&cDu siehst bereits ein Replay. Beende es mit &f/buildreplay stop&c."
+  segment-not-found: "&cAbschnitt &f#{id} &cwurde nicht gefunden."
+  no-permission-others: "&cDu darfst nur deine eigenen Replays abspielen."
+  unavailable: "&cAbschnitt &f#{id} &cist nicht abspielbar (Status: &f{status}&c)."
+  engine-unavailable: "&cAdvancedReplay ist auf diesem Server nicht verfügbar."
+  incompatible: "&cDie Wiedergabe ist auf diesem Server nicht möglich: &f{reason}"
+  not-found: "&cDie Replay-Datei von Abschnitt &f#{id} &cfehlt. Der Abschnitt wurde als fehlend markiert."
+  corrupt: "&cDie Replay-Datei von Abschnitt &f#{id} &cist beschädigt und wurde als defekt markiert."
+  world-missing: "&cDie Welt &f{world} &cvon Abschnitt &f#{id} &cist auf diesem Server nicht geladen."
+  start-failed: "&cDie Wiedergabe von Abschnitt &f#{id} &ckonnte nicht gestartet werden: &7{detail}"
+  backup-failed: "&cDein Inventar konnte nicht gesichert werden - die Wiedergabe startet zur Sicherheit nicht."
+  inventory-restored: "&aDein Inventar aus einer unterbrochenen Wiedergabe wurde wiederhergestellt."
+  inventory-recovered: "&eDie Wiedergabe wurde unerwartet beendet - dein Inventar wurde wiederhergestellt."
+  storage-unavailable: "&cDie Replay-Datenbank ist gerade nicht erreichbar. Bitte versuche es später erneut."
+  error: "&cDie Wiedergabe konnte nicht vorbereitet werden."
+  other-server: "&eAbschnitt &f#{id} &ewurde auf &f{server} &eaufgenommen und kann nur dort abgespielt werden."
+  handoff: "&7Abschnitt &f#{id} &7liegt auf &f{server}&7 - du wirst verbunden, das Replay startet dort automatisch."
+  handoff-arrived: "&7Replay &f#{id} &7startet gleich ..."
+  already-connected: "&cDu bist laut SimpleCloud bereits mit &f{server} &cverbunden - der Abschnitt kann nicht übergeben werden."
+  server-offline: "&cDer Server &f{server} &cist gerade nicht online. Versuche es später erneut."
+  switch-hint: "&eWechsle mit &f{command} &eauf &f{server}&e - das Replay startet dort automatisch. &7(Klicken)"
+  switch-hint-hover: "&7Klicken, um zu &f{server} &7zu wechseln"
+  session-start: "&aSpiele &f{count} &aAbschnitt(e) der Sitzung &f{ref} &aab."
+  session-progress: "&7Abschnitt &f{position}/{total} &7der Sitzung &f{ref}"
+  session-next: "&7Nächster Abschnitt (&f{position}/{total}&7) startet gleich ..."
+  session-next-manual: "&7Nächster Abschnitt: &f/buildreplay play {id}"
+  session-finished: "&aSitzung &f{ref} &avollständig abgespielt."
+  session-not-found: "&cSitzung &f{ref} &cwurde nicht gefunden."
+  session-ambiguous: "&cDie Referenz &f{ref} &cpasst auf mehrere Sitzungen: &f{candidates}&c. Gib mehr Zeichen an."
+  session-empty: "&cDie Sitzung &f{ref} &chat auf diesem Server keine abspielbaren Abschnitte."
+  session-other-servers: "&7{count} Abschnitt(e) dieser Sitzung liegen auf anderen Servern: &f{servers}"
+  session-unavailable: "&7{count} Abschnitt(e) sind nicht mehr verfügbar."
+
+# /buildreplay status
+status:
+  header: "&6BuildReplay-Status &8· &f{server} &8(&7{instance}&8) &8· &7v{version}"
+  simplecloud: "&7SimpleCloud: {state} &8· &7Anfragen &f{requests}&7, Fehler &f{failures} &8· &7zuletzt erfolgreich &f{last}"
+  java-api: "&7SimpleCloud-Java-API: {state}"
+  database: "&7MariaDB: {state} &8· &7Warteschlange &f{queued}&7, Outbox &f{outbox}&7, verworfen &f{dropped} &8· &7Schema &fv{schema}"
+  redis: "&7Redis: {state} &8· &7zuletzt erfolgreich &f{last}"
+  engine: "&7AdvancedReplay &f{version}&7: {state} &8· &7Speicher &f{backend} &8· &7max. Länge &f{maxLength} &8· &7Blockänderungen {blocks}"
+  recordings: "&7Aufnahmen: &f{active} aktiv &8· &7gestartet &f{started}&7, Abschnitte &f{saved}&7, verworfen &f{discarded}&7, Fehler &f{failures}&7, ausstehend &f{pending}"
+  sessions: "&7Sitzungen: &f{local} Spieler &8· &7aufgelöst &f{resolved}&7, vorläufig &f{provisional} &8· &7SimpleCloud-Abfragen &f{lookups} &8(&7{lookupFailures} fehlgeschlagen&8) &8· &7Leader {leader}"
+  warnings: "&eWarnungen:"
+  no-warnings: "&aKeine Warnungen."
+  last-error-hover: "&7Letzter Fehler: &f{error}"
+  state:
+    ok: "&aOK"
+    down: "&cnicht erreichbar"
+    disabled: "&8deaktiviert"
+    fallback: "&elokaler Ersatz"
+    not-configured: "&cnicht konfiguriert"
+    circuit-open: "&cgesperrt (Circuit-Breaker)"
+    not-installed: "&cnicht installiert"
+    unavailable: "&cnicht verfügbar"
+    incompatible: "&eAufnahme OK, Wiedergabe inkompatibel"
+    client-side: "&anur clientseitig"
+    real-world: "&cverändern die Welt"
+    answer-yes: "&aja"
+    answer-no: "&7nein"
+    never: "&8nie"
+
+# /buildreplay admin ...
+admin:
+  recordings:
+    header: "&6Laufende Aufnahmen auf diesem Server &8({count})"
+    empty: "&7Auf diesem Server läuft gerade keine Aufnahme."
+    line: "&8▪ &e{player} &8· &7{world} &8· &7seit &f{since} &8(&7{duration}&8) &8· &f{actions} &7relevante Aktionen{afk}"
+    afk: " &8· &eAFK"
+    hover: "&7Rohaufnahme: &f{raw}\n&7Tick: &f{tick}\n&7Sitzung: &f{session}\n\n&eKlicken für die Diagnose"
+    stats: "&7Seit dem Start: gestartet &f{started}&7, Abschnitte &f{saved}&7, verworfen &f{discarded}&7, Fehler &f{failures}&7, ausstehend &f{pending}"
+  inspect:
+    header: "&6Aufnahme-Diagnose für &e{player}"
+    none: "&7Keine laufende Aufnahme von &e{player} &7auf diesem Server."
+    details: "&7Rohaufnahme: &f{raw}\n&7Welt: &f{world}\n&7Gestartet: &f{since} &8(&7{duration}&8)\n&7Tick: &f{tick}\n&7Relevante Aktionen: &f{actions}\n&7AFK: {afk}\n&7Sitzung: &f{session}"
+    sessions-button: "&e[Sitzungen anzeigen]"
+    sessions-hover: "&7/buildreplay sessions {player}"
+  reload:
+    done: "&aKonfiguration und Texte wurden neu geladen."
+    warnings: "&e{count} Konfigurationswarnung(en):"
+  cleanup:
+    started: "&7Aufräumen läuft …"
+    dry-run-started: "&7Probelauf läuft – es wird nichts gelöscht …"
+    done: "&aAufräumen abgeschlossen: &f{deleted} &agelöscht, &f{failed} &afehlgeschlagen &8(&7{examined} geprüft&8)"
+    dry-run: "&eProbelauf: &f{deleted} &ewürden gelöscht &8(&7{examined} geprüft, nichts verändert&8)"
+  sync:
+    started: "&7Outbox und Sitzungsabgleich werden ausgeführt …"
+    done: "&aOutbox geleert und Sitzungsabgleich mit SimpleCloud ausgeführt."
+
+# Fehler bei Abfragen
+error:
+  storage-unavailable: "&cDatenbank derzeit nicht erreichbar. Bitte versuche es später erneut."
+  simplecloud-unavailable: "&cSimpleCloud nicht erreichbar. Bitte versuche es später erneut."
+  timeout: "&cDie Anfrage hat zu lange gedauert. Bitte versuche es später erneut."
+  busy: "&cBuildReplay ist gerade ausgelastet. Bitte versuche es gleich erneut."
+  maintenance: "&c{reason}"
+  generic: "&cEin interner Fehler ist aufgetreten. Details stehen in der Serverkonsole."

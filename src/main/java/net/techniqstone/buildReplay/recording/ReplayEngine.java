@@ -46,10 +46,17 @@ public interface ReplayEngine {
      */
     void stopRecording(String rawName, boolean keep);
 
-    /** I/O-Thread: Abschnitte ausschneiden und als eigene AdvancedReplay-Replays speichern. */
+    /**
+     * I/O-Thread: Abschnitte ausschneiden und als eigene AdvancedReplay-Replays speichern. Ausnahme: beim
+     * Herunterfahren ({@code onDisable}) wird direkt auf dem Hauptthread zerlegt, weil der I/O-Pool endet - das muss
+     * die Implementierung zulassen.
+     */
     List<SavedSegment> saveSegments(RawRecording raw, List<SegmentCut> cuts);
 
-    /** I/O-Thread: Rohaufnahme unverändert speichern (Fallback, wenn die Zerlegung nicht mehr möglich ist). */
+    /**
+     * I/O-Thread: Rohaufnahme unverändert speichern (Fallback, wenn die Zerlegung nicht mehr möglich ist). Wie
+     * {@link #saveSegments} beim Herunterfahren auch auf dem Hauptthread.
+     */
     void saveRaw(RawRecording raw);
 
     /** Gespeicherte Rohaufnahme laden (zur späteren Zerlegung); leer, wenn nicht vorhanden oder unlesbar. */
@@ -70,6 +77,7 @@ public interface ReplayEngine {
      */
     CompletableFuture<PlaybackStart> play(String replayName, Player viewer, PlaybackOptions options);
 
+    /** Hauptthread (AdvancedReplays Wiedergabeliste ist nicht threadsicher): sieht der Spieler gerade ein Replay? */
     boolean isWatching(Player viewer);
 
     /** Hauptthread: laufende Wiedergabe des Spielers beenden. */
@@ -88,8 +96,9 @@ public interface ReplayEngine {
     List<String> storedReplayNames();
 
     /**
-     * Wird auf dem Hauptthread aufgerufen, wenn eine Wiedergabe endet (natürliches Ende, Verlassen, Quit) und
-     * AdvancedReplay den Zuschauer zurückgesetzt hat ({@code ReplaySessionFinishEvent}).
+     * Wird auf dem Hauptthread aufgerufen, wenn eine über {@link #play} gestartete Wiedergabe endet (natürliches
+     * Ende, Verlassen, Quit) und AdvancedReplay den Zuschauer zurückgesetzt hat ({@code ReplaySessionFinishEvent}).
+     * Fremde Wiedergaben (z. B. AdvancedReplays eigenes {@code /replay play}) lösen ihn nicht aus.
      */
     void onPlaybackFinished(Consumer<Player> listener);
 }

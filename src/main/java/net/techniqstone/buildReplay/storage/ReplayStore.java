@@ -47,7 +47,10 @@ public interface ReplayStore extends AutoCloseable {
 
     void upsertSession(SessionUpsert session);
 
-    /** Setzt Logout-Zeit und Dauer und den Status CLOSED (überschreibt eine bekannte Logout-Zeit nicht mit einer früheren). */
+    /**
+     * Setzt Logout-Zeit und Dauer und den Status CLOSED (überschreibt eine bekannte Logout-Zeit nicht mit einer
+     * früheren). Für einen unbekannten Schlüssel passiert nichts: ohne Spieler lässt sich keine Sitzung anlegen.
+     */
     void closeSession(String sessionKey, Instant logoutTime, @Nullable Long durationSeconds);
 
     /**
@@ -61,8 +64,17 @@ public interface ReplayStore extends AutoCloseable {
 
     void endVisit(String visitKey, Instant leftAt, VisitEndReason reason);
 
+    /**
+     * Legt eine Aufnahme an bzw. aktualisiert sie: ein erneuter Aufruf ergänzt einen bisher fehlenden
+     * Sitzungsschlüssel und übernimmt den Status, außer die Aufnahme ist bereits abgeschlossen (FINALIZED,
+     * DISCARDED, INTERRUPTED, FAILED).
+     */
     void upsertRecording(RecordingUpsert recording);
 
+    /**
+     * Setzt den Status einer Aufnahme - auch den Zwischenstatus FINALIZING während der Zerlegung. Für einen
+     * unbekannten Rohnamen passiert nichts.
+     */
     void finishRecording(String rawName, RecordingStatus status, @Nullable Instant endedAt, int relevantActions,
                          @Nullable String error);
 
@@ -75,6 +87,10 @@ public interface ReplayStore extends AutoCloseable {
 
     // ------------------------------------------------------------------ Lesen (blockierend)
 
+    /**
+     * Sitzung zum {@code session_key} oder - falls keiner passt - zur SimpleCloud-Session-ID. Eine zusammengeführte
+     * Sitzung wird so geliefert, wie sie gespeichert ist (Status MERGED, {@code mergedInto} gesetzt).
+     */
     Optional<SessionRow> findSessionByKey(String sessionKey);
 
     Optional<SessionRow> findSessionById(long sessionId);
@@ -85,12 +101,18 @@ public interface ReplayStore extends AutoCloseable {
      */
     List<SessionRow> findSessionsByRef(UUID playerUuid, String ref, int limit);
 
-    /** Sitzungen eines Spielers ab {@code since}, neueste zuerst (ohne MERGED). */
+    /**
+     * Sitzungen eines Spielers, deren Login (ersatzweise Anlagezeit) nicht vor {@code since} liegt, neueste zuerst
+     * (ohne MERGED). {@link #countSessionsOfPlayer} zählt dieselbe Menge.
+     */
     List<SessionRow> sessionsOfPlayer(UUID playerUuid, Instant since, int limit, int offset);
 
     int countSessionsOfPlayer(UUID playerUuid, Instant since);
 
-    /** Abschnittsstatistik je SimpleCloud-Session-ID (fehlende Sitzungen fehlen in der Map). */
+    /**
+     * Abschnittsstatistik je SimpleCloud-Session-ID (fehlende Sitzungen fehlen in der Map, bekannte ohne Abschnitte
+     * liefern {@link SessionStats#EMPTY}).
+     */
     Map<String, SessionStats> statsByCloudSessionIds(Collection<String> cloudSessionIds);
 
     Map<Long, SessionStats> statsBySessionIds(Collection<Long> sessionIds);
