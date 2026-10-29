@@ -1,0 +1,104 @@
+name: Build & Deploy Plugin
+
+on:
+  push:
+    branches:
+      - main
+
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    # WICHTIG:
+    # Hier den Namen deines GitHub-Environments eintragen
+    environment: push
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Java installieren
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          # Muss zur Toolchain in build.gradle.kts passen (Server laufen auf Java 25).
+          java-version: '25'
+
+      - name: Gradle ausführbar machen
+        run: chmod +x gradlew
+
+      - name: Plugin bauen
+        run: ./gradlew clean build
+
+      - name: SSH vorbereiten
+        env:
+          SERVER_HOST: ${{ vars.SERVER_HOST }}
+          SERVER_PORT: ${{ vars.SERVER_PORT }}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+
+          ssh-keyscan \
+            -p "$SERVER_PORT" \
+            -H "$SERVER_HOST" \
+            >> ~/.ssh/known_hosts
+
+      - name: Plugin deployen
+        env:
+          SERVER_HOST: ${{ vars.SERVER_HOST }}
+          SERVER_PORT: ${{ vars.SERVER_PORT }}
+          SERVER_USER: ${{ vars.SERVER_USER }}
+          PLUGIN_PATH: ${{ vars.PLUGIN_PATH }}
+        run: |
+          shopt -s nullglob
+          jars=(build/libs/*.jar)
+          if [ "${#jars[@]}" -ne 1 ]; then
+            echo "::error title=Deploy::Erwarte genau ein Jar in build/libs, gefunden: ${jars[*]:-keins}"
+            exit 1
+          fi
+          JAR="${jars[0]}"
+          JAR_NAME="$(basename "$JAR")"
+
+          # Quotet einen Pfad für die Remote-Shell; ein führendes ~/ bleibt dort expandierbar.
+          quote_remote() {
+            if [[ "$1" == "~/"* ]]; then
+              printf '"$HOME"/%q' "${1#\~/}"
+            else
+              printf '%q' "$1"
+            fi
+          }
+
+          # Erst in eine temporäre Datei schreiben, dann per mv ersetzen: klappt auch, wenn das
+          # alte Jar root gehört (Ordner gehört mc), und ein laufender Server liest nie ein halb
+          # geschriebenes Jar (er behält die alte Datei offen, bis er neu startet).
+          read -r -d '' REMOTE_SCRIPT <<'EOS' || true
+          set -e
+          if [ -d "$P" ]; then T="$P/$N"; else T="$P"; fi
+          tmp="$(dirname "$T")/.$N.uploading"
+          cat > "$tmp"
+          mv -f "$tmp" "$T"
+          echo "OK: $T"
+          EOS
+
+          failed=0
+          while IFS= read -r path; do
+            # Im Browser eingetragene Variablen haben Windows-Zeilenenden – \r gehört nicht zum Pfad.
+            path="${path%$'\r'}"
+            [ -z "$path" ] && continue
+
+            echo "Deploy nach: $path"
+
+            # Ein fehlgeschlagener Server bricht die übrigen nicht mehr ab.
+            if ! ssh -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" \
+              "P=$(quote_remote "$path"); N=$(printf '%q' "$JAR_NAME"); $REMOTE_SCRIPT" < "$JAR"; then
+              echo "::error title=Deploy fehlgeschlagen::$path"
+              failed=1
+            fi
+          done <<< "$PLUGIN_PATH"
+
+          exit "$failed"
