@@ -205,6 +205,15 @@ public final class BuildReplayCommand implements TabExecutor {
         if (!require(sender, Permissions.USE)) {
             return;
         }
+        // "/buildreplay session <Spieler>" ist ein häufiger Vertipper für "sessions <Spieler>": ein Argument, das keine
+        // Sitzungsreferenz sein kann (nur Hex, optional mit "p" davor), aber ein bekannter Spieler ist -> Sitzungsliste.
+        if (request.playerName() == null && !looksLikeSessionRef(request.ref())) {
+            boolean ownName = sender instanceof Player self && self.getName().equalsIgnoreCase(request.ref());
+            if (ownName || players.find(request.ref()).isPresent()) {
+                listSessions(sender, new CommandRequest.ListSessions(ownName ? null : request.ref(), 0));
+                return;
+            }
+        }
         Target target = resolveTarget(sender, request.playerName(), CommandTexts.USAGE_SESSION);
         if (target == null || !passCooldown(sender)) {
             return;
@@ -411,6 +420,12 @@ public final class BuildReplayCommand implements TabExecutor {
     }
 
     /** Eigene Sitzungen (ohne Namen) oder die eines anderen Spielers (braucht {@link Permissions#OTHERS}); {@code null} = Fehler gemeldet. */
+    /** Sitzungsreferenzen sind Präfixe einer UUID (Hex, Bindestriche erlaubt), vorläufige mit führendem "p". */
+    static boolean looksLikeSessionRef(String ref) {
+        String value = ref.startsWith("p") ? ref.substring(1) : ref;
+        return !value.isEmpty() && value.chars().allMatch(c -> (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || c == '-');
+    }
+
     private @Nullable Target resolveTarget(CommandSender sender, @Nullable String playerName, Text consoleUsage) {
         if (playerName == null) {
             if (sender instanceof Player self) {

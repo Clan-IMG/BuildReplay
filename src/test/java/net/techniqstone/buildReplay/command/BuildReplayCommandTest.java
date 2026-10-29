@@ -117,6 +117,27 @@ class BuildReplayCommandTest {
     }
 
     @Test
+    void sessionWithAPlayerNameInsteadOfAReferenceShowsThatPlayersSessionList() {
+        run(steve, "session", "Steve");
+        assertEquals(List.of(new Fakes.ListCall(STEVE, 0)), queries.listCalls, "eigener Name -> eigene Liste");
+        assertTrue(queries.detailsCalls.isEmpty());
+
+        run(steve, "session", "Alex");
+        assertEquals(1, queries.listCalls.size(), "fremder Spieler braucht weiterhin buildreplay.others");
+        assertTrue(steve.text().contains("Berechtigung"), steve.text());
+
+        run(moderator, "session", "Alex");
+        assertEquals(new Fakes.ListCall(ALEX, 0), queries.listCalls.get(1));
+
+        clock.advance(Duration.ofSeconds(2));
+        run(moderator, "session", "3c8a7573");
+        assertEquals(List.of(new Fakes.DetailsCall(moderator.uuid, "3c8a7573")), queries.detailsCalls,
+                "echte Referenzen bleiben Sitzungsdetails");
+        assertTrue(BuildReplayCommand.looksLikeSessionRef("p1a2b3c"));
+        assertFalse(BuildReplayCommand.looksLikeSessionRef("wrobelxxl"));
+    }
+
+    @Test
     void anUnknownPlayerNameIsReportedClearly() {
         run(moderator, "sessions", "Herobrine");
 
