@@ -1,0 +1,10 @@
+name: BuildReplay
+prefix: [ BuildReplay ]
+version: '${version}'
+
+main: net.techniqstone.buildReplay.BuildReplay
+api-version: '26.3'
+load: POSTWORLD
+
+authors: [ WrobelXXL ]
+website: https://clan-img.net
