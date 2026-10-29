@@ -1,0 +1,237 @@
+# ============================================================================================
+#  BuildReplay - Konfiguration
+#  Zeichnet relevante Bauaktivität pro SimpleCloud-Netzwerksitzung mit AdvancedReplay auf.
+#
+#  Geheimnisse (Passwörter, Secrets) gehören nicht in diese Datei, wenn es sich vermeiden lässt:
+#  Jeder Wert darf ${env:NAME} oder ${env:NAME:-standard} enthalten und wird dann aus der
+#  Umgebungsvariable NAME gelesen. SimpleCloud gibt den Servern SIMPLECLOUD_NETWORK_ID,
+#  SIMPLECLOUD_NETWORK_SECRET und SIMPLECLOUD_CONTROLLER_URL automatisch mit; eigene
+#  Gruppen-Properties erscheinen als SIMPLECLOUD_<key>.
+#  Werte außerhalb der erlaubten Grenzen werden beim Laden korrigiert und im Log gemeldet.
+# ============================================================================================
+config-version: 1
+
+# Netzwerkweiter Name dieses Servers, wie ihn der Proxy kennt ("dev", "build", "lobby-1").
+# Leer = automatisch aus SIMPLECLOUD_GROUP / SIMPLECLOUD_NUMERICAL_ID.
+server-name: ""
+
+logging:
+  # INFO, DEBUG (ausführliche Diagnose) oder WARN
+  level: INFO
+
+# --------------------------------------------------------------------------------------------
+#  SimpleCloud - maßgebliche Quelle für die Spielersitzungen (REST-API /v0/players/...)
+# --------------------------------------------------------------------------------------------
+simplecloud:
+  base-url: "https://controller.simplecloud.app"
+  # Header X-Network-ID
+  network-id: "{{ env.SC_NETWORK_ID }}"
+  # Header X-Network-Credential (Netzwerk-Passwort). Nie im Klartext weitergeben.
+  network-secret: "{{ secrets.SC_NETWORK_SECRET }}"
+  # Plugin simplecloud-api nutzen (Spieler-Events über NATS, Spieler auf anderen Server verbinden).
+  # Ohne das Plugin funktioniert alles über REST, nur der automatische Serverwechsel beim Abspielen fehlt.
+  use-java-api: true
+  connect-timeout-seconds: 5
+  request-timeout-seconds: 10
+  # Wiederholungen bei Zeitüberschreitung, 429 und 5xx (exponentielles Backoff mit Zufallsanteil)
+  max-retries: 3
+  retry-base-delay-millis: 500
+  retry-max-delay-millis: 8000
+  # Nach so vielen Fehlschlägen hintereinander pausieren die Anfragen (keine Last auf eine gestörte API)
+  circuit-breaker:
+    failure-threshold: 5
+    open-seconds: 30
+  # Abgleich der Online-Spieler/Sitzungen - nur die gewählte Leader-Instanz fragt ab
+  online-poll-seconds: 60
+  # Wie lange die Zuordnung Spieler -> Sitzung netzwerkweit (Redis) zwischengespeichert wird
+  session-cache-seconds: 21600
+  # Beim ersten Join legt SimpleCloud die Sitzung mit kurzer Verzögerung an: so lange wird nachgefragt
+  current-session-retry-seconds: 20
+  # Zwischenspeicher für /buildreplay sessions (0 = aus)
+  session-list-cache-seconds: 30
+
+# --------------------------------------------------------------------------------------------
+#  MariaDB - dauerhafte Ablage (Sitzungen, Serveraufenthalte, Aufnahmen, Replay-Abschnitte)
+#  Tabellen und Migrationen werden automatisch angelegt. Ist die Datenbank nicht erreichbar,
+#  werden Schreibvorgänge gepuffert (plugins/BuildReplay/outbox) und später nachgeholt.
+# --------------------------------------------------------------------------------------------
+database:
+  enabled: true
+  host: "10.8.0.1"
+  port: 3332
+  database: "buildreplay"
+  username: "buildreplay"
+  password: "{{ secrets.BUILDREPLAY_DB_PASSWORD }}"
+  # Präfix aller Tabellen (nur Buchstaben, Ziffern, _)
+  table-prefix: "br_"
+  pool-size: 6
+  connection-timeout-millis: 5000
+  # Zusätzliche JDBC-Parameter, z. B. sslMode: "trust"
+  properties: {}
+
+# --------------------------------------------------------------------------------------------
+#  Redis - kurzlebiger, netzwerkweiter Zustand und Koordination der Server
+#  (Sitzungscache, Präsenz bei Serverwechseln, Aufnahmestatus, Sperren, Leader, Wiedergabe-Übergabe).
+#  Fällt Redis aus, arbeitet BuildReplay lokal weiter; Duplikate verhindert MariaDB.
+# --------------------------------------------------------------------------------------------
+redis:
+  enabled: true
+  host: "10.8.0.1"
+  port: 6316
+  username: "default"
+  password: "{{ secrets.BUILDREPLAY_REDIS_PASSWORD }}"
+  database: 0
+  ssl: false
+  key-prefix: "buildreplay:"
+  timeout-millis: 2000
+  pool-size: 8
+
+# --------------------------------------------------------------------------------------------
+#  Aufnahme
+#  Pro Spieler läuft eine Pufferaufnahme. Daraus werden nur die Abschnitte mit relevanter
+#  Aktivität (plus Vor- und Nachlauf) als Replays gespeichert, AFK-Zeit entfällt.
+# --------------------------------------------------------------------------------------------
+recording:
+  enabled: true
+  # Nur diese Welten aufzeichnen (leer = alle)
+  worlds: []
+  # Diese Welten nie aufzeichnen (hat Vorrang)
+  excluded-worlds: []
+  # Spieler in diesen Spielmodi nicht aufzeichnen
+  excluded-gamemodes:
+    - SPECTATOR
+  # Sekunden vor der ersten relevanten Aktion, die im Replay enthalten sind
+  pre-roll-seconds: 10
+  # Sekunden nach der letzten relevanten Aktion
+  post-roll-seconds: 10
+  # Abschnitte mit weniger relevanten Aktionen werden nicht gespeichert
+  min-relevant-actions: 3
+  min-segment-seconds: 5
+  # Längere Abschnitte werden in Teile zerlegt
+  max-segment-minutes: 30
+  # Liegen zwei Abschnitte höchstens so weit auseinander, werden sie verbunden
+  merge-gap-seconds: 20
+  # Spätestens nach dieser Zeit wird eine Pufferaufnahme abgeschlossen und neu begonnen
+  # (AdvancedReplay verwirft Aufnahmen beim Erreichen seiner max_length)
+  rotation-minutes: 20
+  # Während AFK keine Pufferaufnahme laufen lassen (spart Speicher und CPU)
+  stop-while-afk: true
+  # Exakten Blockzustand (Treppen, Stufen, Türen ...) zusätzlich speichern - AdvancedReplay kennt nur das Material
+  block-fidelity: true
+
+# --------------------------------------------------------------------------------------------
+#  Aktivitäts- und AFK-Erkennung
+#  Relevante Aktionen starten/verlängern einen Abschnitt. Indikatoren zeigen nur, dass der
+#  Spieler nicht AFK ist (z. B. Bewegung), starten aber nie einen Abschnitt.
+# --------------------------------------------------------------------------------------------
+activity:
+  # Keine Eingabe (weder Aktion noch Indikator) so lange -> AFK
+  afk-timeout-seconds: 60
+  # Abschnitt endet, wenn so lange keine relevante Aktion kam ...
+  relevant-idle-seconds: 60
+  # ... außer der Spieler war dazwischen nachweislich aktiv - dann höchstens bis zu dieser Lücke
+  max-indicator-extension-seconds: 240
+  # block-place, block-break, bucket, sign-edit, hanging, armor-stand, entity-place,
+  # block-interact, worldedit, axiom, move, look, chat, command, inventory, item-held, swing
+  relevant-actions:
+    - block-place
+    - block-break
+    - bucket
+    - sign-edit
+    - hanging
+    - armor-stand
+    - entity-place
+    - block-interact
+    - worldedit
+    - axiom
+  indicators:
+    - move
+    - look
+    - chat
+    - command
+    - inventory
+    - item-held
+    - swing
+  # Befehle, die als Bauaktion (worldedit) zählen: Präfixe ...
+  edit-command-prefixes:
+    - "//"
+  # ... und Befehlsnamen (ohne /, Namespace wie worldedit: wird ignoriert)
+  edit-commands:
+    - brush
+    - br
+    - fill
+    - setblock
+    - clone
+    - paste
+    - undo
+    - redo
+    - replacenear
+    - removenear
+    - drain
+    - fixwater
+    - fixlava
+    - snow
+    - thaw
+    - green
+    - forestgen
+    - pumpkins
+    - tool
+  # Bewegung erst ab dieser Strecke bzw. Drehung als Indikator werten
+  movement-threshold-blocks: 0.3
+  look-threshold-degrees: 15
+
+# --------------------------------------------------------------------------------------------
+#  Anzeige (/buildreplay sessions)
+# --------------------------------------------------------------------------------------------
+display:
+  # Standardansicht: Sitzungen der letzten N Tage
+  history-days: 14
+  page-size: 8
+  # Maximale Anzahl Sitzungen, durch die geblättert werden kann
+  max-sessions: 200
+  time-zone: "Europe/Berlin"
+  date-time-pattern: "dd.MM.yyyy HH:mm"
+
+# --------------------------------------------------------------------------------------------
+#  Wiedergabe
+# --------------------------------------------------------------------------------------------
+playback:
+  # AdvancedReplays "real_changes: true" verändert bei der Wiedergabe die ECHTE Welt.
+  # true = BuildReplay schaltet das zur Laufzeit ab (Blockänderungen nur für den Zuschauer sichtbar).
+  force-client-side-block-changes: true
+  # Inventar des Zuschauers vorher sichern und bei Fehlern/Quit wiederherstellen
+  protect-inventory: true
+  # Abschnitte anderer Server: Spieler dorthin verbinden und das Replay dort starten
+  cross-server: true
+  handoff-timeout-seconds: 60
+  # Baustand vom Abschnittsbeginn einblenden, damit das Gebäude sichtbar wächst
+  show-initial-state: true
+  # Bei "Ganze Sitzung" automatisch zum nächsten Abschnitt wechseln
+  auto-advance: true
+
+# --------------------------------------------------------------------------------------------
+#  Speicherbegrenzung
+# --------------------------------------------------------------------------------------------
+storage:
+  # Abschnitte älter als N Tage löschen (Replay-Datei + Status in der DB); 0 = nie
+  retention-days: 30
+  cleanup-interval-minutes: 60
+  # Höchstens so viele Abschnitte pro Spieler behalten (älteste zuerst löschen); 0 = unbegrenzt
+  max-segments-per-player: 1000
+
+# --------------------------------------------------------------------------------------------
+#  Verhalten bei Ausfällen und Koordination mehrerer Server
+# --------------------------------------------------------------------------------------------
+resilience:
+  # Maximal gepufferte Schreibvorgänge, solange MariaDB nicht erreichbar ist
+  outbox-max-entries: 10000
+  outbox-flush-seconds: 5
+  health-check-seconds: 15
+  # Ist SimpleCloud nicht erreichbar, vorläufige Sitzungen anlegen und später zuordnen
+  # (false = solche Aufnahmen werden verworfen)
+  provisional-sessions: true
+  presence-ttl-seconds: 45
+  # So lange gilt ein Spieler nach dem Verlassen eines Servers als "im Wechsel"
+  switch-grace-seconds: 30
+  heartbeat-seconds: 15
+  leader-lease-seconds: 30

@@ -1,0 +1,61 @@
+name: BuildReplay
+prefix: BuildReplay
+version: '${version}'
+description: '${description}'
+
+main: net.techniqstone.buildReplay.BuildReplay
+api-version: '1.21'
+load: POSTWORLD
+
+authors: [ WrobelXXL ]
+website: https://clan-img.net
+
+# AdvancedReplay (Replay.jar) zeichnet auf und spielt ab, es braucht ProtocolLib.
+depend: [ AdvancedReplay, ProtocolLib ]
+# simplecloud-api: NATS-Spielerevents und Server-Connect (optional, REST funktioniert auch ohne).
+# WorldEdit/FAWE/Axiom: nur als Aktivitätsquelle, falls vorhanden.
+softdepend: [ simplecloud-api, FastAsyncWorldEdit, WorldEdit, AxiomPaper ]
+
+# Paper lädt diese Bibliotheken beim Start von Maven Central (Versionen aus build.gradle.kts).
+# Gson, Guava und Adventure stellt der Server bereit.
+libraries:
+  - com.zaxxer:HikariCP:${hikari}
+  - org.mariadb.jdbc:mariadb-java-client:${mariadb}
+  - redis.clients:jedis:${jedis}
+
+commands:
+  buildreplay:
+    description: Eigene Spielsitzungen der letzten Tage anzeigen und Bau-Replays abspielen
+    usage: /buildreplay [sessions|session|play|stop|status|admin|help] ...
+    aliases: [ brp, buildreplays ]
+    permission: buildreplay.use
+
+permissions:
+  buildreplay.use:
+    description: /buildreplay sessions|session|help - eigene Sitzungen ansehen
+    default: true
+  buildreplay.play:
+    description: Eigene Replay-Abschnitte abspielen (/buildreplay play, /buildreplay stop)
+    default: true
+  buildreplay.others:
+    description: Sitzungen und Replays anderer Spieler ansehen und abspielen
+    default: op
+  buildreplay.admin:
+    description: /buildreplay status und /buildreplay admin (Diagnose, Reload, Aufräumen)
+    default: op
+  buildreplay.exempt:
+    description: Spieler mit dieser Berechtigung werden nicht aufgezeichnet
+    default: false
+  buildreplay.player:
+    description: Alle Spieler-Berechtigungen von BuildReplay
+    default: true
+    children:
+      buildreplay.use: true
+      buildreplay.play: true
+  buildreplay.*:
+    description: Alles in BuildReplay (ohne buildreplay.exempt)
+    default: op
+    children:
+      buildreplay.player: true
+      buildreplay.others: true
+      buildreplay.admin: true
