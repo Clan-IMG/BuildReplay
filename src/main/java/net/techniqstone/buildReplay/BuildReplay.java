@@ -13,7 +13,9 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Supplier;
+import java.util.logging.Handler;
 import java.util.logging.Level;
+import java.util.logging.LogRecord;
 import java.util.logging.Logger;
 import net.techniqstone.buildReplay.activity.impl.ActivityListener;
 import net.techniqstone.buildReplay.activity.impl.ActivityTracker;
@@ -106,6 +108,7 @@ public final class BuildReplay extends JavaPlugin {
     private @Nullable RecoveryService recovery;
     private @Nullable BuildReplayCommand command;
     private @Nullable Instant lastTickError;
+    private @Nullable Handler debugForwarder;
 
     // ------------------------------------------------------------------ Start
 
@@ -359,6 +362,11 @@ public final class BuildReplay extends JavaPlugin {
         closeQuietly("Redis", shared);
         closeQuietly("SimpleCloud-Java-API", platform);
         closeQuietly("SimpleCloud-REST", cloud);
+        Handler forwarder = debugForwarder;
+        if (forwarder != null) {
+            getLogger().removeHandler(forwarder);
+            debugForwarder = null;
+        }
         clearReferences();
     }
 
@@ -430,12 +438,58 @@ public final class BuildReplay extends JavaPlugin {
         return PluginConfig.from(getConfig(), EnvResolver.system(), warnings);
     }
 
-    /** Protokollstufe von BuildReplay ({@code logging.level}); DEBUG zeigt auch FINE-Meldungen. */
+    /**
+     * Protokollstufe von BuildReplay ({@code logging.level}). Paper gibt JUL-Meldungen unter INFO nicht aus; bei
+     * DEBUG reicht {@link DebugForwarder} sie daher als INFO mit Kennzeichnung {@code [DEBUG]} weiter.
+     */
     private void applyLogLevel(Level level) {
+        Logger logger = getLogger();
         try {
-            getLogger().setLevel(level);
+            logger.setLevel(level);
+            boolean debug = level.intValue() < Level.INFO.intValue();
+            if (debug && debugForwarder == null) {
+                DebugForwarder forwarder = new DebugForwarder(logger);
+                logger.addHandler(forwarder);
+                debugForwarder = forwarder;
+            } else if (!debug && debugForwarder != null) {
+                logger.removeHandler(debugForwarder);
+                debugForwarder = null;
+            }
         } catch (RuntimeException e) {
-            getLogger().log(Level.FINE, "Protokollstufe konnte nicht gesetzt werden", e);
+            logger.log(Level.WARNING, "Protokollstufe " + level + " konnte nicht gesetzt werden", e);
+        }
+    }
+
+    /** Gibt Meldungen unter INFO (FINE, FINER, FINEST) als INFO mit Kennzeichnung über denselben Logger aus. */
+    private static final class DebugForwarder extends Handler {
+
+        private final Logger target;
+
+        DebugForwarder(Logger target) {
+            this.target = target;
+        }
+
+        @Override
+        public void publish(LogRecord record) {
+            if (record == null || record.getLevel().intValue() >= Level.INFO.intValue()) {
+                return;
+            }
+            LogRecord copy = new LogRecord(Level.INFO, "[DEBUG] " + record.getMessage());
+            copy.setParameters(record.getParameters());
+            copy.setThrown(record.getThrown());
+            copy.setLoggerName(record.getLoggerName());
+            copy.setResourceBundle(record.getResourceBundle());
+            target.log(copy);
+        }
+
+        @Override
+        public void flush() {
+            // nichts gepuffert
+        }
+
+        @Override
+        public void close() {
+            // nichts zu schließen
         }
     }
 
